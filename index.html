@@ -249,7 +249,7 @@
             const blob = new Blob([JSON.stringify(pacientes)], {type: "application/json"});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url; a.download = BACKUP_GR_${new Date().toISOString().slice(0,10)}.json;
+            a.href = url; a.download = `BACKUP_GR_${new Date().toISOString().slice(0,10)}.json`;
             a.click();
         }
 
@@ -283,7 +283,7 @@
 
             // Textos
             ctx.fillStyle = "#1a2a6c"; ctx.textAlign = "center"; ctx.font = "bold 15px Arial";
-            ctx.fillText("PACIENTE: " + (d.nombre || "________").toUpperCase(), 425, 40);
+            ctx.fillText("PACIENTE: " + (d.nombre || "____________________").toUpperCase(), 425, 40);
             
             ctx.fillStyle = "#333"; ctx.font = "11px Arial";
             wrapText(ctx, "FOCO / CONFLICTO NUCLEAR:\n"+(d.foco || ""), 220, 320, 160, 16);
