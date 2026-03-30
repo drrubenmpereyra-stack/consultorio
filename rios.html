@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Clínico GR - Modelo Fiorini</title>
+    <style>
+        :root { --primary: #1a2a6c; --accent: #b21f1f; --success: #27ae60; --info: #2980b9; --bg: #f4f7f6; --text: #333; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; color: var(--text); }
+        
+        /* PANTALLA DE ACCESO */
+        #login-screen { position: fixed; inset: 0; background: var(--primary); display: flex; justify-content: center; align-items: center; z-index: 2000; transition: 0.5s; }
+        .login-box { background: white; padding: 40px; border-radius: 15px; width: 340px; text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
+        .login-box input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 1em; }
+        .btn-login { background: var(--accent); color: white; border: none; padding: 14px; width: 100%; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 1.1em; margin-top: 10px; transition: 0.3s; }
+        .btn-login:hover { background: #8e1a1a; }
+
+        /* INTERFAZ PRINCIPAL */
+        #app-content { display: none; flex-direction: column; height: 100%; padding: 15px; box-sizing: border-box; }
+        .header { background: var(--primary); color: white; padding: 12px 25px; border-radius: 10px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .logo-group { display: flex; align-items: center; gap: 15px; }
+        
+        .main-layout { display: flex; gap: 15px; flex-grow: 1; overflow: hidden; }
+
+        /* Sidebar: Lista de Pacientes */
+        .sidebar { width: 240px; background: white; border-radius: 10px; padding: 15px; display: flex; flex-direction: column; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .patient-list { overflow-y: auto; flex-grow: 1; margin-top: 15px; border-top: 1px solid #eee; }
+        .patient-item { padding: 12px; border-bottom: 1px solid #f9f9f9; cursor: pointer; font-size: 0.9em; position: relative; border-radius: 5px; margin-bottom: 2px; }
+        .patient-item:hover { background: #f0f4f8; color: var(--primary); }
+        .delete-btn { position: absolute; right: 8px; top: 12px; color: #ddd; border: none; background: none; cursor: pointer; font-size: 1.1em; }
+        .delete-btn:hover { color: var(--accent); }
+
+        /* Formulario Clínico */
+        .form-panel { width: 380px; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); overflow-y: auto; }
+        label { display: block; font-size: 0.75em; font-weight: bold; color: var(--info); margin: 12px 0 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .hint { font-size: 0.7em; color: #888; font-style: italic; display: block; margin-bottom: 6px; line-height: 1.3; }
+        input, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 0.95em; transition: 0.2s; }
+        input:focus, textarea:focus { border-color: var(--info); outline: none; background: #fafcff; }
+        textarea { height: 65px; resize: none; border-left: 4px solid var(--info); }
+        
+        /* Botonera */
+        .actions { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        button.action-btn { border: none; border-radius: 6px; cursor: pointer; font-weight: bold; padding: 12px; font-size: 0.85em; transition: 0.3s; }
+        .btn-save { background: var(--success); color: white; grid-column: span 2; }
+        .btn-new { background: #34495e; color: white; width: 100%; padding: 12px; margin-bottom: 10px; }
+        .btn-print { background: #7f8c8d; color: white; }
+        .btn-backup { background: #8e44ad; color: white; }
+        .btn-import { background: #d35400; color: white; }
+
+        /* Gráfico */
+        .graph-panel { flex-grow: 1; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 15px rgba(0,0,0,0.05); display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        canvas { max-height: 100%; max-width: 100%; border: 1px solid #f0f0f0; border-radius: 4px; }
+
+        /* IMPRESIÓN */
+        @media print {
+            #login-screen, .sidebar, .form-panel, .header, .btn-new { display: none !important; }
+            #app-content { display: block; padding: 0; }
+            .graph-panel { box-shadow: none; border: none; width: 100%; padding: 0; margin-top: 0; }
+            body { background: white; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen">
+        <div class="login-box">
+            <svg width="70" height="70" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="48" stroke="#1a2a6c" stroke-width="2" fill="none" opacity="0.2"/>
+                <path d="M25,30 v25 a25,25 0 0,0 50,0 v-25 M50,15 v70" stroke="#1a2a6c" stroke-width="6" fill="none" stroke-linecap="round"/>
+                <text x="58" y="85" font-family="Arial" font-weight="bold" font-size="26" fill="#b21f1f">GR</text>
+            </svg>
+            <h2 style="margin: 15px 0; color: #333;">Acceso Restringido</h2>
+            <input type="text" id="userIn" placeholder="Usuario">
+            <input type="password" id="passIn" placeholder="Contraseña">
+            <button class="btn-login" onclick="validarAcceso()">Entrar al Sistema</button>
+            <p id="errorMsg" style="color:red; font-size:0.85em; margin-top:15px; display:none;">Credenciales Incorrectas</p>
+        </div>
+    </div>
+
+    <div id="app-content">
+        <div class="header">
+            <div class="logo-group">
+                <svg width="35" height="35" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="48" stroke="white" stroke-width="2" fill="none" opacity="0.4"/>
+                    <path d="M25,30 v25 a25,25 0 0,0 50,0 v-25 M50,15 v70" stroke="white" stroke-width="6" fill="none" stroke-linecap="round"/>
+                    <text x="58" y="85" font-family="Arial" font-weight="bold" font-size="26" fill="#ff4d4d">GR</text>
+                </svg>
+                <h2 style="margin:0; font-size: 1.1em; letter-spacing: 0.5px;">Gestión Clínica - Psicoterapia de Foco</h2>
+            </div>
+            <button onclick="location.reload()" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.3); color:white; padding:5px 12px; border-radius:5px; cursor:pointer; font-size:0.75em;">Cerrar Sesión</button>
+        </div>
+
+        <div class="main-layout">
+            <div class="sidebar">
+                <button class="btn-new" onclick="nuevo()">+ Nuevo Paciente</button>
+                <input type="text" id="buscador" placeholder="🔍 Buscar por nombre..." oninput="renderLista()">
+                <div class="patient-list" id="listaPacientes"></div>
+                
+                <div style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+                    <label style="color:#666; margin-bottom: 8px;">Sincronización Nube</label>
+                    <button class="action-btn btn-backup" onclick="exportarDB()" style="width:100%; margin-bottom:5px;">☁️ Crear Backup</button>
+                    <button class="action-btn btn-import" onclick="document.getElementById('fileIn').click()" style="width:100%;">📥 Cargar Backup</button>
+                    <input type="file" id="fileIn" style="display:none" onchange="importarDB(event)">
+                </div>
+            </div>
+
+            <div class="form-panel">
+                <label>Ficha de Identificación</label>
+                <input type="text" id="nombre" placeholder="Apellido y Nombres" oninput="actualizar()">
+                <div style="display:flex; gap:8px; margin-top:8px;">
+                    <input type="text" id="edad" placeholder="Edad" oninput="actualizar()">
+                    <input type="text" id="prof" placeholder="Profesión" oninput="actualizar()">
+                </div>
+
+                <label>1. Núcleo del Foco</label>
+                <span class="hint">Motivo de consulta y Conflicto Nuclear central (Eje de la cura).</span>
+                <textarea id="foco" oninput="actualizar()"></textarea>
+
+                <label>2. Situación Grupal</label>
+                <span class="hint">Roles, dinámicas, vínculos y recursos del entorno primario.</span>
+                <textarea id="grupal" oninput="actualizar()"></textarea>
+
+                <label>3. Aspectos Caracterológicos</label>
+                <span class="hint">Rasgos de personalidad, mecanismos defensivos y adaptativos.</span>
+                <textarea id="caracter" oninput="actualizar()"></textarea>
+
+                <label>4. Contexto Amplio</label>
+                <span class="hint">Determinantes socioeconómicos, culturales e ideológicos.</span>
+                <textarea id="contexto" oninput="actualizar()"></textarea>
+                
+                <div class="actions">
+                    <button class="action-btn btn-save" onclick="guardar()">💾 GUARDAR EN BASE DE DATOS</button>
+                    <button class="action-btn btn-print" onclick="window.print()">🖨️ IMPRIMIR REPORTE</button>
+                </div>
+            </div>
+
+            <div class="graph-panel">
+                <canvas id="canvasFiorini" width="850" height="650"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- AUTENTICACIÓN ---
+        function validarAcceso() {
+            const u = document.getElementById('userIn').value;
+            const p = document.getElementById('passIn').value;
+            if(u === "RIOS" && p === "17319305") {
+                document.getElementById('login-screen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('login-screen').style.display = 'none';
+                    document.getElementById('app-content').style.display = 'flex';
+                    actualizar();
+                }, 500);
+            } else {
+                document.getElementById('errorMsg').style.display = 'block';
+            }
+        }
+
+        // --- GESTIÓN DE DATOS ---
+        let pacientes = JSON.parse(localStorage.getItem('db_clinica_gr')) || [];
+        let idActual = null;
+        const canvas = document.getElementById('canvasFiorini');
+        const ctx = canvas.getContext('2d');
+
+        function actualizar() {
+            dibujar({
+                nombre: document.getElementById('nombre').value,
+                foco: document.getElementById('foco').value,
+                grupal: document.getElementById('grupal').value,
+                caracter: document.getElementById('caracter').value,
+                contexto: document.getElementById('contexto').value
+            });
+        }
+
+        function guardar() {
+            const nom = document.getElementById('nombre').value;
+            if(!nom) return alert("Por favor, ingrese el nombre del paciente.");
+            
+            const ficha = {
+                id: idActual || Date.now(),
+                nombre: nom,
+                edad: document.getElementById('edad').value,
+                prof: document.getElementById('prof').value,
+                foco: document.getElementById('foco').value,
+                grupal: document.getElementById('grupal').value,
+                caracter: document.getElementById('caracter').value,
+                contexto: document.getElementById('contexto').value,
+                fecha: new Date().toLocaleDateString()
+            };
+
+            if(idActual) {
+                const idx = pacientes.findIndex(p => p.id === idActual);
+                pacientes[idx] = ficha;
+            } else {
+                pacientes.push(ficha);
+                idActual = ficha.id;
+            }
+
+            localStorage.setItem('db_clinica_gr', JSON.stringify(pacientes));
+            renderLista();
+            alert("Paciente guardado con éxito.");
+        }
+
+        function renderLista() {
+            const lista = document.getElementById('listaPacientes');
+            const busqueda = document.getElementById('buscador').value.toLowerCase();
+            lista.innerHTML = '';
+            
+            pacientes.filter(p => p.nombre.toLowerCase().includes(busqueda)).forEach(p => {
+                const item = document.createElement('div');
+                item.className = 'patient-item';
+                item.innerHTML = `
+                    <div onclick="cargar(${p.id})">
+                        <strong>${p.nombre}</strong><br>
+                        <small style="color:#888">${p.prof || 'Sin profesión'}</small>
+                    </div>
+                    <button class="delete-btn" onclick="eliminar(${p.id})">✕</button>
+                `;
+                lista.appendChild(item);
+            });
+        }
+
+        function cargar(id) {
+            const p = pacientes.find(p => p.id === id);
+            idActual = p.id;
+            document.getElementById('nombre').value = p.nombre;
+            document.getElementById('edad').value = p.edad;
+            document.getElementById('prof').value = p.prof;
+            document.getElementById('foco').value = p.foco;
+            document.getElementById('grupal').value = p.grupal;
+            document.getElementById('caracter').value = p.caracter;
+            document.getElementById('contexto').value = p.contexto;
+            actualizar();
+        }
+
+        function nuevo() { idActual = null; document.querySelectorAll('input, textarea').forEach(e => e.value = ''); actualizar(); }
+
+        function eliminar(id) {
+            if(confirm("¿Seguro que desea eliminar este registro?")) {
+                pacientes = pacientes.filter(p => p.id !== id);
+                localStorage.setItem('db_clinica_gr', JSON.stringify(pacientes));
+                nuevo(); renderLista();
+            }
+        }
+
+        // --- BACKUP ---
+        function exportarDB() {
+            const blob = new Blob([JSON.stringify(pacientes)], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = BACKUP_GR_${new Date().toISOString().slice(0,10)}.json;
+            a.click();
+        }
+
+        function importarDB(e) {
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const data = JSON.parse(evt.target.result);
+                    if(confirm("Se reemplazará la lista actual. ¿Continuar?")) {
+                        pacientes = data;
+                        localStorage.setItem('db_clinica_gr', JSON.stringify(pacientes));
+                        renderLista(); alert("Base de datos importada.");
+                    }
+                } catch(err) { alert("Error al leer el archivo."); }
+            };
+            reader.readAsText(e.target.files[0]);
+        }
+
+        // --- MOTOR GRÁFICO ---
+        function dibujar(d) {
+            ctx.fillStyle = "white"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = "#000"; ctx.lineWidth = 1.5;
+
+            // Esquema Fiorini (Círculo + Cono)
+            ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.arc(220, 325, 95, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+            ctx.beginPath(); ctx.moveTo(300, 260); ctx.lineTo(780, 80); ctx.lineTo(780, 570); ctx.lineTo(300, 390); ctx.stroke();
+            
+            // Divisiones de Niveles
+            ctx.beginPath(); ctx.moveTo(460, 205); ctx.lineTo(460, 445); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(620, 150); ctx.lineTo(620, 500); ctx.stroke();
+
+            // Textos
+            ctx.fillStyle = "#1a2a6c"; ctx.textAlign = "center"; ctx.font = "bold 15px Arial";
+            ctx.fillText("PACIENTE: " + (d.nombre || "________").toUpperCase(), 425, 40);
+            
+            ctx.fillStyle = "#333"; ctx.font = "11px Arial";
+            wrapText(ctx, "FOCO / CONFLICTO NUCLEAR:\n"+(d.foco || ""), 220, 320, 160, 16);
+            wrapText(ctx, "SITUACIÓN GRUPAL:\n"+(d.grupal || ""), 380, 320, 130, 16);
+            wrapText(ctx, "INDIVIDUAL / DEFENSAS:\n"+(d.caracter || ""), 540, 320, 140, 16);
+            wrapText(ctx, "CONTEXTO AMPLIO:\n"+(d.contexto || ""), 700, 320, 140, 16);
+
+            // Marca de agua Logo GR
+            ctx.globalAlpha = 0.05; ctx.fillStyle = "#1a2a6c"; ctx.font = "bold 120px Arial";
+            ctx.fillText("GR", 425, 360); ctx.globalAlpha = 1;
+
+            // Pie de página
+            ctx.font = "italic 10px Arial"; ctx.fillStyle = "#aaa"; ctx.textAlign = "right";
+            ctx.fillText("Sistema de Gestión Clínica GR - Basado en Héctor Fiorini", 830, 640);
+        }
+
+        function wrapText(c, t, x, y, m, l) {
+            t.split('\n').forEach(line => {
+                let words = line.split(' '), cur = '';
+                words.forEach(w => {
+                    let test = cur + w + ' ';
+                    if (c.measureText(test).width > m) { c.fillText(cur, x, y); cur = w + ' '; y += l; }
+                    else cur = test;
+                });
+                c.fillText(cur, x, y); y += l;
+            });
+        }
+
+        window.onload = renderLista;
+    </script>
+</body>
+</html>
